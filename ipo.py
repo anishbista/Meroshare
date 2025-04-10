@@ -11,6 +11,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+
+results = []
 
 ACCOUNTS_FILE = "accounts.json"
 if not os.path.exists(ACCOUNTS_FILE):
@@ -202,15 +208,49 @@ def login(account):
 
                 # Add a small delay to avoid overwhelming the server
                 time.sleep(2)
+                if "toast-error" in toast_class:
+                    results.append(
+                        f"Name: {account['name']}\nStatus: ❌ Application failed: {toast_message}"
+                    )
+                elif "toast-success" in toast_class:
+                    results.append(
+                        f"Name: {account['name']}\nStatus: ✅ Application succeeded: {toast_message}"
+                    )
+                else:
+                    results.append(
+                        f"Name: {account['name']}\nStatus: ⚠️ Unexpected toast type: {toast_message}"
+                    )
 
-                breakpoint()
                 print("✅ Login successful!")
 
     except Exception as e:
-        print(f"❌ Login failed: {e}")
+        results.append(f"Name: {account['name']}\nStatus: ❌ Login failed: {e}")
 
     finally:
         driver.quit()
+
+
+def send_email(results):
+    sender_email = os.environ.get("SENDER_EMAIL")
+    sender_password = os.environ.get("SENDER_PASSWORD")
+    recipient_email = os.environ.get("RECIPIENT_EMAIL")
+    subject = "IPO Application Results"
+    body = "\n".join(results)
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        print("✅ Email sent successfully!")
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
 
 
 # Create and start threads for each account
@@ -225,3 +265,5 @@ for i, account in enumerate(accounts):
 # Wait for all threads to complete
 for thread in threads:
     thread.join()
+
+send_email(results)
