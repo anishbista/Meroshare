@@ -79,7 +79,6 @@ def login(account):
             )
         )
         apply_for_issue.click()
-        breakpoint()
 
         company_list = WebDriverWait(driver, 10).until(
             EC.presence_of_all_elements_located(
@@ -216,10 +215,12 @@ def login(account):
 
 # Create and start threads for each account
 threads = []
-for account in accounts:
+for i, account in enumerate(accounts):
     thread = threading.Thread(target=login, args=(account,))
     threads.append(thread)
     thread.start()
+    if i < len(accounts) - 1:  # Add delay between launches
+        time.sleep(5)
 
 # Wait for all threads to complete
 for thread in threads:
